@@ -1,7 +1,7 @@
 import torch
 from torchvision import io as tio
 
-from functis.config import ColorMode
+from .config import ColorMode
 
 
 class Converter:

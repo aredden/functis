@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Generator, List, Optional, Union
+from typing import Generator, Generic, List, Optional, Tuple, Union, TypeVar, overload, TypeGuard
 from warnings import warn
 
 import cv2
@@ -19,16 +19,15 @@ except ImportError:
     NVJpeg = None
 
 
-from functis.colormode_parser import Converter, parse_colormode_torch
-from functis.config import (
-    ColorMode,
-    DataType,
-    Device,
-    ImageLayout,
-    ReadConfig,
-    ReadMethod,
-    SpecificConfig,
-)
+from .colormode_parser import Converter, parse_colormode_torch
+from .config import (ColorMode, DataType, Device, ImageLayout, ReadConfig,
+                     ReadMethod, SpecificConfig)
+
+UsesPath = TypeVar("UsesPath")
+
+ImageT = TypeVar("ImageT", Image.Image, np.ndarray, torch.Tensor)
+
+
 
 
 class ImageIOBase:
@@ -165,6 +164,13 @@ class ImageIO(ImageIOBase):
         if converter is None:
             converter = parse_colormode_torch(specific_config.color_mode)
 
+        if using_nvjpeg and path.suffix.lower() not in [".jpg", ".jpeg"]:
+            warn(
+                f"nvjpeg only supports jpeg images, falling back to torchvision for file: {path}"
+            )
+            return self._read_torch(
+                path, specific_config, converter, using_nvjpeg=False
+            )
         image_bytes_torch = tio.read_file(path.as_posix()) if not using_nvjpeg else None
 
         suffix = path.suffix.lower()
@@ -194,7 +200,7 @@ class ImageIO(ImageIOBase):
                                 f"Invalid color mode: {self.config.color_mode}"
                             )
                     image = torch.from_numpy(image).to(specific_config.device).permute(
-                        2, 0, 1)
+                        2, 0, 1).type(torch.uint8)
                 else:
                     raise e
         elif suffix in [".jpg", ".jpeg"] and using_nvjpeg:
@@ -291,12 +297,54 @@ class ImageIO(ImageIOBase):
 
         return im
 
+    @overload
     def read_dir(
-        self, dirpath: Union[str, Path]
-    ) -> Generator[Union[Image.Image, np.ndarray, torch.Tensor], None, None]:
-        ...
+        self, dirpath: Union[str, Path], recursive: bool, return_paths: bool = False
+    ) -> Generator[Union[Image.Image, torch.Tensor, np.ndarray], None, None]: ...
+
+    @overload
+    def read_dir(
+        self, dirpath: Union[str, Path], recursive: bool, return_paths:bool= True
+    ) -> Generator[Tuple[Path, Union[Image.Image, torch.Tensor, np.ndarray]], None, None]: ...
+
+    def read_dir(
+        self, dirpath: Union[str, Path], recursive: bool = False, return_paths = False
+    ):
+        dirpath = Path(dirpath) if not isinstance(dirpath, Path) else dirpath
+        if recursive:
+            for path in dirpath.rglob("*"):
+                if path.is_file() and path.suffix.lower().lstrip('.') in self.config.image_extensions:
+                    if return_paths:
+                        yield path, self.read(path)
+                    else:
+                        yield self.read(path)
+        else:
+            for path in dirpath.glob("*"):
+                if path.is_file() and path.suffix.lower().lstrip('.') in self.config.image_extensions:
+                    if return_paths:
+                        yield path, self.read(path)
+                    else:
+                        yield self.read(path)
+
+    @overload
+    def read_list(
+        self, paths: List[Union[str, Path]], return_paths = False
+    ) -> Generator[Union[Image.Image, torch.Tensor, np.ndarray], None, None]: ...
+
+    @overload
+    def read_list(
+        self, paths: List[Union[str, Path]], return_paths = True
+    ) -> Generator[Tuple[Path, Union[Image.Image, torch.Tensor, np.ndarray]], None, None]: ...
 
     def read_list(
-        self, paths: List[Union[str, Path]]
-    ) -> Generator[Union[Image.Image, np.ndarray, torch.Tensor], None, None]:
-        ...
+        self, paths: List[Union[str, Path]], return_paths = False
+    ):
+        for path in paths:
+            path = Path(path) if not isinstance(path, Path) else path
+            if path.is_file() and path.suffix.lower().lstrip('.') in self.config.image_extensions:
+                if return_paths:
+                     yield path, self.read(path)
+                else:
+                     yield self.read(path)
+            else:
+                warn(f"Invalid image path, will ignore: {path}", UserWarning)

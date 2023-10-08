@@ -1,14 +1,14 @@
-import warnings
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple
 from warnings import warn
 
 import cv2
-from loguru import logger
 import numpy as np
 import torch
 from PIL import Image
 from pydantic import BaseModel
+
+
 def torch_permuter(img: torch.Tensor, channels: int = 3) -> torch.Tensor:
     if channels == 1 and 1 not in img.shape:
         return img
@@ -269,6 +269,14 @@ class ReadConfig(BaseModel):
     color_mode: ColorMode = ColorMode.rgb
     read_method: ReadMethod = ReadMethod.torch
     image_layout: ImageLayout = ImageLayout.hwc
+    image_extensions: Tuple[str, ...] = (
+        "jpg",
+        "jpeg",
+        "png",
+        "bmp",
+        "tif",
+        "tiff",
+    )
 
     def to_torch(self, idx: Optional[int] = None) -> "SpecificConfig":
         return SpecificConfig(

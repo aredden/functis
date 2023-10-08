@@ -1,3 +1,4 @@
-from .config import ImageLayout, ImageType, ColorMode, ReadConfig, SpecificConfig, ReadMethod, DataType
-from .colormode_parser import parse_colormode_torch, Converter
-from .image import ImageIO as ImageReader
+from .images.colormode_parser import Converter, parse_colormode_torch
+from .images.config import (ColorMode, DataType, ImageLayout, ImageType,
+                            ReadConfig, ReadMethod, SpecificConfig)
+from .images.image import ImageIO as ImageReader
