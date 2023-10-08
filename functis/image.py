@@ -97,7 +97,7 @@ class ImageIO(ImageIOBase):
 
     def with_color(self, color_mode: Union[ColorMode, str]) -> "ImageIO":
         if isinstance(color_mode, str):
-            self.config.color_mode = ColorMode(color_mode)
+            self.config.color_mode = ColorMode(color_mode.upper())
         elif isinstance(color_mode, ColorMode):
             self.config.color_mode = color_mode
         else:
@@ -300,25 +300,3 @@ class ImageIO(ImageIOBase):
         self, paths: List[Union[str, Path]]
     ) -> Generator[Union[Image.Image, np.ndarray, torch.Tensor], None, None]:
         ...
-
-
-"""
-from functis import ImageReader
-
-imreader = ImageReader().with_reader("torch").with_device("cuda:0").with_format("hwc")
-
-options for readmode: "torch", "np", "pil", "nvjpeg"
-options for device: "cuda:<index>", "cuda", "cpu"
-options for format: "hwc", "chw"
-options for color_mode: "rgb", "bgr", "rgba", "bgra", "grayscale"
-options for data_type: "uint8", "float32", "float16" # only for torch and np
-options for image_type: "pil", "np", "torch"
-
-imreader.read("./your_image.jpg")
-or
-for image in imreader.read_dir("./your_image_directory"):
-    ....
-or..
-for image in imreader.read_images(list_of_your_images):
-    ....
-"""
