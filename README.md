@@ -39,10 +39,21 @@ image = imreader.read("./your_image.jpg")
 for image in imreader.read_dir("./your_image_directory"):
     # process or view your image
     ...
+
+# For recursive reading...
+for image in imreader.read_dir("./your_image_directory", recursive=True):
+    # process or view your image
+    ...
+
+# Also will optionally include paths...
+for path, image in imreader.read_dir("./your_image_directory", return_paths=True):
+    # process or view your image
+    ...
 ```
 
 ### Reading a List of Images
 
+> Can also return paths, similar to read_dir.
 ```python
 for image in imreader.read_list(list_of_your_images):
     # process or view your image
