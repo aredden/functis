@@ -7,16 +7,19 @@
 ## Features
 
 - **Read Modes**: Supports multiple reading backends including `torch`, `np`, `pil`, and `nvjpeg`.
+    > note: torch is torchvision.io, np uses cv2, and nvjpeg is a private library I have yet to expose publically.
 - **Device Placement**: Place your data on any CUDA device or CPU.
 - **Image Format**: Choose between `hwc` or `chw` formats.
 - **Color Modes**: Multiple color options including `rgb`, `bgr`, `rgba`, `bgra`, and `grayscale`.
-- **Data Types**: Supports `uint8`, `float32`, and `float16` for `torch` and `np` backends.
+- **Data Types**: Supports `uint8`, `float32`, and `float16` for `torch`, `nvjpeg` and `np` backends.
 - **Output Types**: Get the result in `pil`, `np`, or `torch` formats.
 
 ## Installation
 
 ```bash
-pip install functis
+git clone https://github.com/aredden/functis
+cd functis
+python -m pip install .
 ```
 
 ## Usage
@@ -41,7 +44,7 @@ for image in imreader.read_dir("./your_image_directory"):
 ### Reading a List of Images
 
 ```python
-for image in imreader.read_images(list_of_your_images):
+for image in imreader.read_list(list_of_your_images):
     # process or view your image
     ...
 ```
