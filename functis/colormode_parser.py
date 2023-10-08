@@ -50,7 +50,7 @@ class Converter:
             elif channels == 4 and self.channels == 3:
                 img = img[..., :3]
             elif channels == 3 and self.channels == 4:
-                img = torch.cat([img, torch.ones_like(img[..., :1])], dim=-1)
+                img = torch.cat([img, torch.ones_like(img[..., :1])*255], dim=-1)
             # elif channels == 1 and self.channels == 4:
             #     img = img[...,None].repeat(1, 1, 3)
             #     img = torch.cat(img, torch.ones_like(img[..., :1]))

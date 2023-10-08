@@ -30,15 +30,15 @@ def torch_permuter(img: torch.Tensor, channels: int = 3) -> torch.Tensor:
             channel_index = img.shape.index(3)
             if channel_index == 0:
                 img = torch.cat(
-                    [img, torch.ones_like(img[:1, :, :])], dim=0
+                    [img, torch.ones_like(img[:1, :, :])*255], dim=0
                 )
             elif channel_index == 1:
                 img = torch.cat(
-                    [img, torch.ones_like(img[:, :1, :])], dim=1
+                    [img, torch.ones_like(img[:, :1, :])*255], dim=1
                 )
             elif channel_index == 2:
                 img = torch.cat(
-                    [img, torch.ones_like(img[:, :, :1])], dim=2
+                    [img, torch.ones_like(img[:, :, :1])*255], dim=2
                 )
             else:
                 raise ValueError(
