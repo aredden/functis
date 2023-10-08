@@ -29,25 +29,16 @@ def torch_permuter(img: torch.Tensor, channels: int = 3) -> torch.Tensor:
         if channels == 4 and 3 in img.shape:
             channel_index = img.shape.index(3)
             if channel_index == 0:
-                img = torch.cat(
-                    [img, torch.ones_like(img[:1, :, :])*255], dim=0
-                )
+                img = torch.cat([img, torch.ones_like(img[:1, :, :]) * 255], dim=0)
             elif channel_index == 1:
-                img = torch.cat(
-                    [img, torch.ones_like(img[:, :1, :])*255], dim=1
-                )
+                img = torch.cat([img, torch.ones_like(img[:, :1, :]) * 255], dim=1)
             elif channel_index == 2:
-                img = torch.cat(
-                    [img, torch.ones_like(img[:, :, :1])*255], dim=2
-                )
+                img = torch.cat([img, torch.ones_like(img[:, :, :1]) * 255], dim=2)
             else:
-                raise ValueError(
-                    f"Invalid number of channels: {channels}, {img.shape}"
-                )
-    assert (
-        channels in img.shape
-    ), f"Invalid number of channels: {channels}, {img.shape}"
+                raise ValueError(f"Invalid number of channels: {channels}, {img.shape}")
+    assert channels in img.shape, f"Invalid number of channels: {channels}, {img.shape}"
     return img, img.shape.index(channels)
+
 
 class ImageLayout(str, Enum):
     hwc: str = "hwc"
@@ -92,33 +83,58 @@ class ImageLayout(str, Enum):
             raise ValueError(f"Invalid image layout: {self}")
 
     def to_np(self) -> Callable[[np.ndarray], np.ndarray]:
-        def np_transpose(img: np.ndarray, channels: int = 3, color_hint='rgb') -> np.ndarray:
+        def np_transpose(
+            img: np.ndarray, channels: int = 3, color_hint="rgb"
+        ) -> np.ndarray:
             if channels == 1 and 1 not in img.shape:
                 return img
             elif channels == 1 and 1 in img.shape:
                 return img.squeeze(img.shape.index(1))
             elif len(img.shape) == 2 and channels == 3:
-                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB) if color_hint == 'rgb' else cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                img = (
+                    cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+                    if color_hint == "rgb"
+                    else cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                )
             elif len(img.shape) == 2 and channels == 4:
-                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGBA) if color_hint == 'rgb' else cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+                img = (
+                    cv2.cvtColor(img, cv2.COLOR_GRAY2RGBA)
+                    if color_hint == "rgb"
+                    else cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+                )
             elif channels == 3 and img.shape[-1] == 3:
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if color_hint == 'rgb' else img
+                img = (
+                    cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if color_hint == "rgb" else img
+                )
             elif channels == 4 and img.shape[-1] == 3:
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA) if color_hint == 'rgb' else cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+                img = (
+                    cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+                    if color_hint == "rgb"
+                    else cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+                )
             elif channels == 3 and img.shape[-1] == 4:
-                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB) if color_hint == 'rgb' else cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                img = (
+                    cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                    if color_hint == "rgb"
+                    else cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                )
             elif channels == 4 and img.shape[-1] == 4:
-                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA) if color_hint == 'rgb' else img
+                img = (
+                    cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+                    if color_hint == "rgb"
+                    else img
+                )
             else:
                 raise ValueError(f"Invalid number of channels: {channels}, {img.shape}")
-            
-            assert channels in img.shape, f"Unexpected number of channels in image, expected {channels}, got: {img.shape}"
+
+            assert (
+                channels in img.shape
+            ), f"Unexpected number of channels in image, expected {channels}, got: {img.shape}"
             if self == ImageLayout.chw:
                 img = img.transpose(2, 0, 1)
             return img
 
         return np_transpose
-    
 
     def to_pil(self) -> Callable[[Image.Image], Image.Image]:
         def permute_fn(x):
@@ -175,7 +191,7 @@ class DataType(str, Enum):
         elif self == DataType.float16:
             return "F;16"
         elif self == DataType.pil_image:
-            return ''
+            return ""
         else:
             raise ValueError(f"Invalid data type: {self}")
 

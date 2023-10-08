@@ -1,5 +1,15 @@
 from pathlib import Path
-from typing import Generator, Generic, List, Optional, Tuple, Union, TypeVar, overload, TypeGuard
+from typing import (
+    Generator,
+    Generic,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    TypeVar,
+    overload,
+    TypeGuard,
+)
 from warnings import warn
 
 import cv2
@@ -20,14 +30,19 @@ except ImportError:
 
 
 from .colormode_parser import Converter, parse_colormode_torch
-from .config import (ColorMode, DataType, Device, ImageLayout, ReadConfig,
-                     ReadMethod, SpecificConfig)
+from .config import (
+    ColorMode,
+    DataType,
+    Device,
+    ImageLayout,
+    ReadConfig,
+    ReadMethod,
+    SpecificConfig,
+)
 
 UsesPath = TypeVar("UsesPath")
 
 ImageT = TypeVar("ImageT", Image.Image, np.ndarray, torch.Tensor)
-
-
 
 
 class ImageIOBase:
@@ -132,7 +147,9 @@ class ImageIO(ImageIOBase):
         return self
 
     def read(self, path: Union[str, Path], **kwargs):
-        specific_config = kwargs.get("specific_config", None) or self.config.to_specific_config()
+        specific_config = (
+            kwargs.get("specific_config", None) or self.config.to_specific_config()
+        )
         if self.config.read_method == ReadMethod.torch:
             converter = kwargs.get("converter", None) or parse_colormode_torch(
                 specific_config.color_mode
@@ -151,6 +168,26 @@ class ImageIO(ImageIOBase):
             return self._read_torch(path, specific_config, converter, using_nvjpeg=True)
         else:
             raise ValueError(f"Invalid read_method: {self.config.read_method}")
+
+    def _read_fallback_torch(
+        self, path: Path, converter: Converter, specific_config: SpecificConfig
+    ):
+        image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR)
+        if len(image.shape) == 2:
+            if self.config.color_mode.name == ColorMode.grayscale.name:
+                return image
+            image = image[..., None]
+        elif image.shape[-1] == 4 and converter.channels == 3:
+            image = image[..., :3]
+        elif image.shape[-1] == 3 and converter.channels == 4:
+            if self.config.color_mode.name.lower().startswith("bgr"):
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA, image)
+            elif self.config.color_mode.name.lower().startswith("rgb"):
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA, image)
+            else:
+                raise ValueError(f"Invalid color mode: {self.config.color_mode}")
+        image = torch.from_numpy(image).to(specific_config.device).permute(2, 0, 1)
+        return image
 
     def _read_torch(
         self,
@@ -178,34 +215,23 @@ class ImageIO(ImageIOBase):
         if suffix in [".jpg", ".jpeg"] and not using_nvjpeg:
             try:
                 image = tio.decode_jpeg(
-                    image_bytes_torch, mode=converter.mode, device=specific_config.device
+                    image_bytes_torch,
+                    mode=converter.mode,
+                    device=specific_config.device,
                 )
             except RuntimeError as e:
                 if "The provided mode is not supported" in str(e):
                     warn(
                         f"Mode {converter.mode} not supported by torchvision.io.decode_jpeg, falling back to cv2.imread for file: {path}"
                     )
-                    image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR)
-                    if len(image.shape) == 2:
-                        image = image[..., None]
-                    elif image.shape[-1] == 4 and converter.channels == 3:
-                        image = image[..., :3]
-                    elif image.shape[-1] == 3 and converter.channels == 4:
-                        if self.config.color_mode.name.lower().startswith("bgr"):
-                            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA, image)
-                        elif self.config.color_mode.name.lower().startswith("rgb"):
-                            image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA, image)
-                        else:
-                            raise ValueError(
-                                f"Invalid color mode: {self.config.color_mode}"
-                            )
-                    image = torch.from_numpy(image).to(specific_config.device).permute(
-                        2, 0, 1).type(torch.uint8)
+                    image = self._read_fallback_torch(path, converter, specific_config)
                 else:
                     raise e
         elif suffix in [".jpg", ".jpeg"] and using_nvjpeg:
             try:
-                image = self._nvjpeg.read_image(path.as_posix(), self._device_for_nvjpeg)
+                image = self._nvjpeg.read_image(
+                    path.as_posix(), self._device_for_nvjpeg
+                )
             except RuntimeError as e:
                 warn(
                     f"Error reading image from nvjpeg torch: {e}, falling back to reading with torchvision for file: {path}"
@@ -220,9 +246,12 @@ class ImageIO(ImageIOBase):
                 specific_config.device
             )
         else:
-            image = tio.decode_image(image_bytes_torch, mode=converter.mode).to(
-                specific_config.device
-            )
+            try:
+                image = tio.decode_image(image_bytes_torch, mode=converter.mode).to(
+                    specific_config.device
+                )
+            except RuntimeError as e:
+                image = self._read_fallback_torch(path, converter, specific_config)
 
         if using_nvjpeg:
             image = converter.do_conversion_nvjpeg(image)
@@ -251,7 +280,7 @@ class ImageIO(ImageIOBase):
         self, path: Union[str, Path], specific_config: SpecificConfig
     ) -> np.ndarray:  # -> Any:
         path = Path(path) if not isinstance(path, Path) else path
-        hint = 'bgr' if self.config.color_mode.name.lower().startswith("bgr") else "rgb"
+        hint = "bgr" if self.config.color_mode.name.lower().startswith("bgr") else "rgb"
         readmode, channels, flip = specific_config.color_mode
         image = cv2.imread(path.as_posix(), readmode)
         image = specific_config.image_layout(image, channels, hint)
@@ -276,7 +305,9 @@ class ImageIO(ImageIOBase):
                 npim = cv2.cvtColor(npim, cv2.COLOR_RGBA2BGRA, npim)
                 im = Image.fromarray(npim)
             else:
-                raise ValueError(f"Invalid number of image dimensions: {len(im.split())}")
+                raise ValueError(
+                    f"Invalid number of image dimensions: {len(im.split())}"
+                )
         elif specific_config.color_mode.upper() == "BGR":
             if len(im.split()) == 1:
                 npim = np.array(im)
@@ -291,7 +322,9 @@ class ImageIO(ImageIOBase):
                 npim = cv2.cvtColor(npim, cv2.COLOR_RGB2BGR, npim)
                 im = Image.fromarray(npim)
             else:
-                raise ValueError(f"Invalid number of image dimensions: {len(im.split())}")
+                raise ValueError(
+                    f"Invalid number of image dimensions: {len(im.split())}"
+                )
         else:
             im = im.convert(specific_config.color_mode)
 
@@ -300,27 +333,37 @@ class ImageIO(ImageIOBase):
     @overload
     def read_dir(
         self, dirpath: Union[str, Path], recursive: bool, return_paths: bool = False
-    ) -> Generator[Union[Image.Image, torch.Tensor, np.ndarray], None, None]: ...
+    ) -> Generator[Union[Image.Image, torch.Tensor, np.ndarray], None, None]:
+        ...
 
     @overload
     def read_dir(
-        self, dirpath: Union[str, Path], recursive: bool, return_paths:bool= True
-    ) -> Generator[Tuple[Path, Union[Image.Image, torch.Tensor, np.ndarray]], None, None]: ...
+        self, dirpath: Union[str, Path], recursive: bool, return_paths: bool = True
+    ) -> Generator[
+        Tuple[Path, Union[Image.Image, torch.Tensor, np.ndarray]], None, None
+    ]:
+        ...
 
     def read_dir(
-        self, dirpath: Union[str, Path], recursive: bool = False, return_paths = False
+        self, dirpath: Union[str, Path], recursive: bool = False, return_paths=False
     ):
         dirpath = Path(dirpath) if not isinstance(dirpath, Path) else dirpath
         if recursive:
             for path in dirpath.rglob("*"):
-                if path.is_file() and path.suffix.lower().lstrip('.') in self.config.image_extensions:
+                if (
+                    path.is_file()
+                    and path.suffix.lower().lstrip(".") in self.config.image_extensions
+                ):
                     if return_paths:
                         yield path, self.read(path)
                     else:
                         yield self.read(path)
         else:
             for path in dirpath.glob("*"):
-                if path.is_file() and path.suffix.lower().lstrip('.') in self.config.image_extensions:
+                if (
+                    path.is_file()
+                    and path.suffix.lower().lstrip(".") in self.config.image_extensions
+                ):
                     if return_paths:
                         yield path, self.read(path)
                     else:
@@ -328,23 +371,28 @@ class ImageIO(ImageIOBase):
 
     @overload
     def read_list(
-        self, paths: List[Union[str, Path]], return_paths = False
-    ) -> Generator[Union[Image.Image, torch.Tensor, np.ndarray], None, None]: ...
+        self, paths: List[Union[str, Path]], return_paths=False
+    ) -> Generator[Union[Image.Image, torch.Tensor, np.ndarray], None, None]:
+        ...
 
     @overload
     def read_list(
-        self, paths: List[Union[str, Path]], return_paths = True
-    ) -> Generator[Tuple[Path, Union[Image.Image, torch.Tensor, np.ndarray]], None, None]: ...
+        self, paths: List[Union[str, Path]], return_paths=True
+    ) -> Generator[
+        Tuple[Path, Union[Image.Image, torch.Tensor, np.ndarray]], None, None
+    ]:
+        ...
 
-    def read_list(
-        self, paths: List[Union[str, Path]], return_paths = False
-    ):
+    def read_list(self, paths: List[Union[str, Path]], return_paths=False):
         for path in paths:
             path = Path(path) if not isinstance(path, Path) else path
-            if path.is_file() and path.suffix.lower().lstrip('.') in self.config.image_extensions:
+            if (
+                path.is_file()
+                and path.suffix.lower().lstrip(".") in self.config.image_extensions
+            ):
                 if return_paths:
-                     yield path, self.read(path)
+                    yield path, self.read(path)
                 else:
-                     yield self.read(path)
+                    yield self.read(path)
             else:
                 warn(f"Invalid image path, will ignore: {path}", UserWarning)

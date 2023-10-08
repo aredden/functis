@@ -14,6 +14,23 @@ class Converter:
         return self.mode
 
     def do_conversion(self, img: torch.Tensor):
+        channels = img.shape[0] if len(img.shape) == 3 else 1
+        if channels != self.channels:
+            # convert to correct number of channels
+            if channels == 1 and self.channels != 1:
+                img = img.repeat(3, 1, 1)
+                if self.channels == 4:
+                    img = torch.cat([img, torch.ones_like(img[:1, ...])], dim=0)
+                return img
+
+            elif channels in [3, 4] and self.channels == 1:
+                img = img[:3, :, :].float().mean(0).clamp(0, 255).to(torch.uint8)
+            elif channels == 4 and self.channels == 3:
+                img = img[:3, ...]
+            elif channels == 3 and self.channels == 4:
+                img = torch.cat([img, torch.ones_like(img[:1, ...]) * 255], dim=0)
+            else:
+                raise ValueError(f"Invalid number of channels: {channels}, {img.shape}")
         if self.channels == 1:
             if 1 in img.shape:
                 return img.squeeze(img.shape.index(1))
@@ -26,11 +43,11 @@ class Converter:
                 return img
         elif self.channels == 4:
             if self.flip:
-                return torch.cat([img[:3, :, :].flip(0), img[3, :, :][None]])
+                return torch.cat([img[:3, :, :].flip(0), img[3:, :, :]], dim=0)
             else:
                 return img
         else:
-            raise ValueError(f"Invalid number of channels: {self.channels}, {img.shape}")
+            raise ValueError(f"Invalid number of channels: {channels}")
 
     def do_conversion_nvjpeg(self, img: torch.Tensor):
         """
@@ -40,20 +57,17 @@ class Converter:
         if channels != self.channels:
             # convert to correct number of channels
             if channels == 1 and self.channels != 1:
-                img = img.repeat(1,1,3)
+                img = img.repeat(1, 1, 3)
                 if self.channels == 4:
                     img = torch.cat([img, torch.ones_like(img[..., :1])], dim=-1)
                 return img
 
-            elif channels in [3,4] and self.channels == 1:
-                img = img[:,:,:3].float().mean(2).clamp(0, 255).to(torch.uint8)
+            elif channels in [3, 4] and self.channels == 1:
+                img = img[:, :, :3].float().mean(2).clamp(0, 255).to(torch.uint8)
             elif channels == 4 and self.channels == 3:
                 img = img[..., :3]
             elif channels == 3 and self.channels == 4:
-                img = torch.cat([img, torch.ones_like(img[..., :1])*255], dim=-1)
-            # elif channels == 1 and self.channels == 4:
-            #     img = img[...,None].repeat(1, 1, 3)
-            #     img = torch.cat(img, torch.ones_like(img[..., :1]))
+                img = torch.cat([img, torch.ones_like(img[..., :1]) * 255], dim=-1)
             else:
                 raise ValueError(f"Invalid number of channels: {channels}, {img.shape}")
         if self.channels == 1:

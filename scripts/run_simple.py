@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).parent.parent.as_posix()))
-from functis.config import ColorMode, ReadConfig, ReadMethod
+from functis import ColorMode, ReadConfig, ReadMethod
 import torch
 parent_dir = Path(__file__).parent.parent
 test_image_dir = parent_dir / "tests" / "test_images"
@@ -45,7 +45,7 @@ dtype_to_torch_dtype = {
     # "uint32": torch.uint32,
 }
 def test_read_image(image_path, config: ReadConfig):
-    from functis.image import ImageIO
+    from functis.images.image import ImageIO
     img = ImageIO(config).read(image_path)
     if config.color_mode == ColorMode.grayscale and config.read_method != ReadMethod.pil:
         assert len(img.shape) == 2, f"{img.shape} != 2 for {config} and file {image_path}"
@@ -84,10 +84,20 @@ def test_read_image(image_path, config: ReadConfig):
             assert img.mode == config.color_mode.value, f"{img.mode} != {config.color_mode} for {config} and file {image_path}"
 
 if __name__ == "__main__":
-    total_configs_to_test = len(list(test_image_dir.glob("*.jpg"))) * len(list(generate_read_configs()))
+    total_configs_to_test = len(list(test_image_dir.glob("*.png"))) * len(list(generate_read_configs()))
+    total_configs_to_test = len(list(test_image_dir.glob("*.bmp"))) * len(list(generate_read_configs())) + total_configs_to_test
+    total_configs_to_test = len(list(test_image_dir.glob("*.webp"))) * len(list(generate_read_configs())) + total_configs_to_test
+    total_configs_to_test = len(list(test_image_dir.glob("*.tiff"))) * len(list(generate_read_configs())) + total_configs_to_test
+    total_configs_to_test = len(list(test_image_dir.glob("*.jpg"))) * len(list(generate_read_configs())) + total_configs_to_test
     print(f"Testing {total_configs_to_test} configurations")
+    exts = ["*.png",
+    "*.bmp",
+    "*.webp",
+    "*.tiff",
+    "*.jpg"]
     tq = tqdm(total=total_configs_to_test, desc="Testing configurations")
-    for image_path in test_image_dir.glob("*.jpg"):
-        for config in generate_read_configs():
-            test_read_image(image_path, config)
-            tq.update(1)
+    for ext in exts:
+        for image_path in test_image_dir.glob(ext):
+            for config in generate_read_configs():
+                test_read_image(image_path, config)
+                tq.update(1)
