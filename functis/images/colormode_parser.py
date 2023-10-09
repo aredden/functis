@@ -11,13 +11,16 @@ class Converter:
         self.flip = flip
         self.channels = channels
 
-    def to_grayscale(self, img: torch.Tensor, layout: Literal['hwc','chw']):
-        img, _ = (img[:3].unbind(0),img[3:]) if layout == 'chw' else (img[...,:3].unbind(-1),img[...,3:])
-        R,G,B = img
-        L = R.float() * 299/1000 + G.float() * 587/1000 + B.float() * 114/1000
-        L = L.clamp(0,255).type(torch.uint8)
+    def to_grayscale(self, img: torch.Tensor, layout: Literal["hwc", "chw"]):
+        img, _ = (
+            (img[:3].unbind(0), img[3:])
+            if layout == "chw"
+            else (img[..., :3].unbind(-1), img[..., 3:])
+        )
+        R, G, B = img
+        L = R.float() * 299 / 1000 + G.float() * 587 / 1000 + B.float() * 114 / 1000
+        L = L.clamp(0, 255).type(torch.uint8)
         return L
-
 
     def to_readmode(self):
         return self.mode
@@ -33,8 +36,7 @@ class Converter:
                 return img
 
             elif channels in [3, 4] and self.channels == 1:
-                img = self.to_grayscale(img,'chw')
-                img = img[:3, :, :].float().mean(0).clamp(0, 255).to(torch.uint8)
+                img = self.to_grayscale(img, "chw")
             elif channels == 4 and self.channels == 3:
                 img = img[:3, ...]
             elif channels == 3 and self.channels == 4:
@@ -73,7 +75,7 @@ class Converter:
                 return img
 
             elif channels in [3, 4] and self.channels == 1:
-                img = self.to_grayscale(img, 'hwc')
+                img = self.to_grayscale(img, "hwc")
             elif channels == 4 and self.channels == 3:
                 img = img[..., :3]
             elif channels == 3 and self.channels == 4:
