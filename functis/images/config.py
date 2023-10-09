@@ -57,7 +57,9 @@ class ImageLayout(str, Enum):
                 if channels_index == 0:
                     return img.permute(1, 2, 0)
                 elif channels_index == 1:
-                    warn_once(f"channels_index == 1, this is probably wrong! {img.shape}")
+                    warn_once(
+                        f"channels_index == 1, this is probably wrong! {img.shape}"
+                    )
                     return img.permute(0, 2, 1)
                 elif channels_index == 2:
                     return img
@@ -293,7 +295,7 @@ class ReadConfig(BaseModel):
         "bmp",
         "tif",
         "tiff",
-        "webp"
+        "webp",
     )
 
     def to_torch(self, idx: Optional[int] = None) -> "SpecificConfig":

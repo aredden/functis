@@ -1,7 +1,5 @@
-import inspect
 from pathlib import Path
 from typing import Generator, List, Optional, Tuple, TypeVar, Union, overload
-from warnings import warn
 
 import cv2
 import numpy as np
@@ -10,6 +8,7 @@ import yaml
 from PIL import Image
 from torchvision import io as tio
 from yaml import load as yaml_load
+
 from .warns import warn_once
 
 has_nvjpeg = False
@@ -170,12 +169,33 @@ class ImageIO(ImageIOBase):
             image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR)
             if image is None:
                 raise ValueError(f"cv2.imread returned None for file: {path}")
+            if len(image.shape) > 2:
+                if image.shape[-1] == 4:
+                    image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGBA)
+                elif image.shape[-1] == 3:
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                else:
+                    raise ValueError(
+                        f"Unsupported number of color channels! {image.shape[-1]}, only 3 or 4 (or grayscale) are supported."
+                    )
+            else:
+                image = np.ascontiguousarray(image).copy()
         except Exception as e:
             warn_once(
                 f"Error reading image with cv2: {e}, falling back to PIL for file: {path}"
             )
-            image = Image.open(path.as_posix()).convert("RGB")
-            image = np.asarray(image)[:, :, ::-1].copy()
+            image = Image.open(path.as_posix())
+            if len(image.split()) == 2:
+                image = image.convert("RGB")
+            elif len(image.split()) == 4:
+                image = image.convert("RGBA")
+            elif len(image.split()) == 3:
+                image = image.convert("RGB")
+            else:
+                raise ValueError(
+                    f"Unsupported number of color channels! {len(image.split())}, only 3 or 4 (or grayscale) are supported."
+                )
+            image = np.asarray(image).copy()
         if len(image.shape) == 2:
             if self.config.color_mode.name == ColorMode.grayscale.name:
                 return image
@@ -184,7 +204,7 @@ class ImageIO(ImageIOBase):
             image = image[..., :3]
         elif image.shape[-1] == 3 and converter.channels == 4:
             if self.config.color_mode.name.lower().startswith("bgr"):
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA, image)
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA, image)
             elif self.config.color_mode.name.lower().startswith("rgb"):
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA, image)
             else:
