@@ -1,8 +1,6 @@
 # Functis: A Universal Image Reader
 
-`functis` is a universal image reader designed for seamless reading of images into multiple formats, including PIL Images, Torch Tensors, and NumPy arrays using OpenCV (cv2). It offers flexibility in device placement, image format, color modes, data types, and output types.
-
-### Under construction, only single images work at the moment, hopefully.. heheheh
+`functis` is a universal image reader designed for seamless reading of images into multiple formats, including PIL Images, torch Tensors via torchvision.io, and NumPy arrays via OpenCV. It offers flexibility in device placement, image format, color modes, data types, and output types.
 
 ## Features
 
