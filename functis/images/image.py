@@ -125,6 +125,9 @@ class ImageIO(ImageIOBase):
         else:
             raise ValueError(f"Invalid image_layout: {image_layout}")
         return self
+    
+    def with_format(self, image_layout: Union[ImageLayout, str]) -> "ImageIO":
+        return self.with_layout(image_layout)
 
     def with_reader(self, read_method: Union[ReadMethod, str]) -> "ImageIO":
         if isinstance(read_method, str):
