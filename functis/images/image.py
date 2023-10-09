@@ -105,7 +105,6 @@ class ImageIO(ImageIOBase):
             self._device_idx = device.index
         else:
             raise ValueError(f"Invalid device: {device}")
-        self.config.device = device
         self._init_nvjpeg(self.config.read_method)
         return self
 
