@@ -1,12 +1,13 @@
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple
-from warnings import warn
 
 import cv2
 import numpy as np
 import torch
 from PIL import Image
 from pydantic import BaseModel
+
+from .warns import warn_once
 
 
 def torch_permuter(img: torch.Tensor, channels: int = 3) -> torch.Tensor:
@@ -19,7 +20,7 @@ def torch_permuter(img: torch.Tensor, channels: int = 3) -> torch.Tensor:
         if idx_1 == 0:
             img = img.repeat(3, 1, 1)
         elif idx_1 == 1:
-            warn(f"idx_1 == 1, this is probably wrong! {img.shape}")
+            warn_once(f"idx_1 == 1, this is probably wrong! {img.shape}")
             img = img.repeat(1, 3, 1)
         elif idx_1 == 2:
             img = img.repeat(1, 1, 3)
@@ -56,7 +57,7 @@ class ImageLayout(str, Enum):
                 if channels_index == 0:
                     return img.permute(1, 2, 0)
                 elif channels_index == 1:
-                    warn(f"channels_index == 1, this is probably wrong! {img.shape}")
+                    warn_once(f"channels_index == 1, this is probably wrong! {img.shape}")
                     return img.permute(0, 2, 1)
                 elif channels_index == 2:
                     return img
@@ -73,7 +74,7 @@ class ImageLayout(str, Enum):
                 if channels_index == 0:
                     return img
                 elif channels_index == 1:
-                    warn("channels_index == 1, this is probably wrong!")
+                    warn_once("channels_index == 1, this is probably wrong!")
                     return img.permute(1, 0, 2)
                 elif channels_index == 2:
                     return img.permute(2, 0, 1)
@@ -292,6 +293,7 @@ class ReadConfig(BaseModel):
         "bmp",
         "tif",
         "tiff",
+        "webp"
     )
 
     def to_torch(self, idx: Optional[int] = None) -> "SpecificConfig":

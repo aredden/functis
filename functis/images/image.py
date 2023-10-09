@@ -1,15 +1,6 @@
+import inspect
 from pathlib import Path
-from typing import (
-    Generator,
-    Generic,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    TypeVar,
-    overload,
-    TypeGuard,
-)
+from typing import Generator, List, Optional, Tuple, TypeVar, Union, overload
 from warnings import warn
 
 import cv2
@@ -19,6 +10,7 @@ import yaml
 from PIL import Image
 from torchvision import io as tio
 from yaml import load as yaml_load
+from .warns import warn_once
 
 has_nvjpeg = False
 try:
@@ -125,7 +117,7 @@ class ImageIO(ImageIOBase):
         else:
             raise ValueError(f"Invalid image_layout: {image_layout}")
         return self
-    
+
     def with_format(self, image_layout: Union[ImageLayout, str]) -> "ImageIO":
         return self.with_layout(image_layout)
 
@@ -174,7 +166,16 @@ class ImageIO(ImageIOBase):
     def _read_fallback_torch(
         self, path: Path, converter: Converter, specific_config: SpecificConfig
     ):
-        image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR)
+        try:
+            image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR)
+            if image is None:
+                raise ValueError(f"cv2.imread returned None for file: {path}")
+        except Exception as e:
+            warn_once(
+                f"Error reading image with cv2: {e}, falling back to PIL for file: {path}"
+            )
+            image = Image.open(path.as_posix()).convert("RGB")
+            image = np.asarray(image)[:, :, ::-1].copy()
         if len(image.shape) == 2:
             if self.config.color_mode.name == ColorMode.grayscale.name:
                 return image
@@ -204,7 +205,7 @@ class ImageIO(ImageIOBase):
             converter = parse_colormode_torch(specific_config.color_mode)
 
         if using_nvjpeg and path.suffix.lower() not in [".jpg", ".jpeg"]:
-            warn(
+            warn_once(
                 f"nvjpeg only supports jpeg images, falling back to torchvision for file: {path}"
             )
             return self._read_torch(
@@ -223,7 +224,7 @@ class ImageIO(ImageIOBase):
                 )
             except RuntimeError as e:
                 if "The provided mode is not supported" in str(e):
-                    warn(
+                    warn_once(
                         f"Mode {converter.mode} not supported by torchvision.io.decode_jpeg, falling back to cv2.imread for file: {path}"
                     )
                     image = self._read_fallback_torch(path, converter, specific_config)
@@ -235,7 +236,7 @@ class ImageIO(ImageIOBase):
                     path.as_posix(), self._device_for_nvjpeg
                 )
             except RuntimeError as e:
-                warn(
+                warn_once(
                     f"Error reading image from nvjpeg torch: {e}, falling back to reading with torchvision for file: {path}"
                 )
                 # This is okay because if torchvision fails, it will fall back to cv2 to read the image.
@@ -397,4 +398,4 @@ class ImageIO(ImageIOBase):
                 else:
                     yield self.read(path)
             else:
-                warn(f"Invalid image path, will ignore: {path}", UserWarning)
+                warn_once(f"Invalid image path, will ignore: {path}", UserWarning)

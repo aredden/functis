@@ -7,3 +7,11 @@ functis.egg-info/
 build/
 dist/
 test_real.py
+*.png
+*.webp
+*.jpeg
+*.jpg
+*.tiff
+*.tif
+*.gif
+*.zst
