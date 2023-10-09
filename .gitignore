@@ -1,12 +1,7 @@
-.coverage
-tests/test_images
+# python compiled files
 __pycache__
-.pytest_cache
-htmlcov/
-functis.egg-info/
-build/
-dist/
-test_real.py
+
+# images
 *.png
 *.webp
 *.jpeg
@@ -15,3 +10,18 @@ test_real.py
 *.tif
 *.gif
 *.zst
+
+# folders
+htmlcov/
+functis.egg-info/
+build/
+dist/
+local_scripts/
+
+# test extras
+tests/test_images
+.pytest_cache
+.coverage
+
+# local files
+test_real.py
