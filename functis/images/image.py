@@ -371,6 +371,13 @@ class ImageIO(ImageIOBase):
         self, dirpath: Union[str, Path], recursive: bool = False, return_paths=False
     ):
         dirpath = Path(dirpath) if not isinstance(dirpath, Path) else dirpath
+        extra_kwargs = {
+            "specific_config": self.config.to_specific_config(),
+        }
+        if self.config.read_method in [ReadMethod.torch,ReadMethod.nvjpeg]:
+            extra_kwargs["converter"] = parse_colormode_torch(
+                self.config.color_mode
+            )
         if recursive:
             for path in dirpath.rglob("*"):
                 if (
@@ -378,9 +385,9 @@ class ImageIO(ImageIOBase):
                     and path.suffix.lower().lstrip(".") in self.config.image_extensions
                 ):
                     if return_paths:
-                        yield path, self.read(path)
+                        yield path, self.read(path, **extra_kwargs)
                     else:
-                        yield self.read(path)
+                        yield self.read(path, **extra_kwargs)
         else:
             for path in dirpath.glob("*"):
                 if (
@@ -388,9 +395,9 @@ class ImageIO(ImageIOBase):
                     and path.suffix.lower().lstrip(".") in self.config.image_extensions
                 ):
                     if return_paths:
-                        yield path, self.read(path)
+                        yield path, self.read(path, **extra_kwargs)
                     else:
-                        yield self.read(path)
+                        yield self.read(path, **extra_kwargs)
 
     @overload
     def read_list(
@@ -407,6 +414,11 @@ class ImageIO(ImageIOBase):
         ...
 
     def read_list(self, paths: List[Union[str, Path]], return_paths=False):
+        extra_kwargs = {}
+        if self.config.read_method in [ReadMethod.torch,ReadMethod.nvjpeg]:
+            extra_kwargs["converter"] = parse_colormode_torch(
+                self.config.color_mode
+            )
         for path in paths:
             path = Path(path) if not isinstance(path, Path) else path
             if (
@@ -414,8 +426,8 @@ class ImageIO(ImageIOBase):
                 and path.suffix.lower().lstrip(".") in self.config.image_extensions
             ):
                 if return_paths:
-                    yield path, self.read(path)
+                    yield path, self.read(path, **extra_kwargs)
                 else:
-                    yield self.read(path)
+                    yield self.read(path, **extra_kwargs)
             else:
                 warn_once(f"Invalid image path, will ignore: {path}", UserWarning)

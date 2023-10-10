@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.as_posix()))
-from functis.config import ColorMode, ReadConfig, ReadMethod
+from functis.images.config import ColorMode, ReadConfig, ReadMethod
 import torch
 parent_dir = Path(__file__).parent.parent
 test_image_dir = parent_dir / "tests" / "test_images"
@@ -45,11 +45,11 @@ dtype_to_torch_dtype = {
     # "uint32": torch.uint32,
 }
 
-@pytest.mark.parametrize("image_path", [*test_image_dir.glob("*.jpg")])
+@pytest.mark.parametrize("image_path", [*test_image_dir.glob("*.jpg"), *test_image_dir.glob("*.png"), *test_image_dir.glob("*.bmp"), *test_image_dir.glob("*.tiff"), *test_image_dir.glob("*.webp")])
 @pytest.mark.parametrize("config", generate_read_configs())
 def test_read_image(image_path, config: ReadConfig):
-    from functis.image import ImageIO
-    img = ImageIO(config).read(image_path)
+    from functis.images import ImageReader
+    img = ImageReader(config).read(image_path)
     if config.color_mode == ColorMode.grayscale and config.read_method != ReadMethod.pil:
         assert len(img.shape) == 2, f"{img.shape} != 2 for {config} and file {image_path}"
     elif config.color_mode in [ColorMode.rgb, ColorMode.bgr] and config.read_method != ReadMethod.pil:
