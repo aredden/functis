@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="functis",
-    version="0.1.1",
+    version="0.1.2",
     packages=find_packages(),
     requires=[
         "numpy",
@@ -12,6 +12,7 @@ setup(
         "torchvision",
         "pydantic",
         "pyyaml",
+        "imghdr"
     ],
     author="Alex Redden",
     author_email="alex@aredden.net",

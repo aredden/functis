@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 from typing import Generator, List, Optional, Tuple, TypeVar, Union, overload
 
@@ -19,6 +20,7 @@ try:
 except ImportError:
     NVJpeg = None
 
+import imghdr
 
 from .colormode_parser import Converter, parse_colormode_torch
 from .config import (
@@ -56,6 +58,7 @@ class ImageIOBase:
 
 
 class ImageIO(ImageIOBase):
+    _nvjpeg: NVJpeg
     def __init__(self, read_config: ReadConfig = None, **kwargs) -> None:
         if read_config is None:
             read_config = ReadConfig()
@@ -139,7 +142,7 @@ class ImageIO(ImageIOBase):
             raise ValueError(f"Invalid data_type: {data_type}")
         return self
 
-    def read(self, path: Union[str, Path], **kwargs):
+    def read(self, path: Union[bytes, str, Path], **kwargs):
         specific_config = (
             kwargs.get("specific_config", None) or self.config.to_specific_config()
         )
@@ -166,7 +169,7 @@ class ImageIO(ImageIOBase):
         self, path: Path, converter: Converter, specific_config: SpecificConfig
     ):
         try:
-            image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR)
+            image = cv2.imread(path.as_posix(), cv2.IMREAD_COLOR) if not isinstance(path,bytes) else cv2.imdecode(np.frombuffer(path, dtype=np.uint8), cv2.IMREAD_COLOR)
             if image is None:
                 raise ValueError(f"cv2.imread returned None for file: {path}")
             if len(image.shape) > 2:
@@ -184,7 +187,10 @@ class ImageIO(ImageIOBase):
             warn_once(
                 f"Error reading image with cv2: {e}, falling back to PIL for file: {path}"
             )
-            image = Image.open(path.as_posix())
+            if isinstance(path,bytes):
+                image = Image.open(io.BytesIO(path))
+            else:
+                image = Image.open(path.as_posix())
             if len(image.split()) == 2:
                 image = image.convert("RGB")
             elif len(image.split()) == 4:
@@ -219,21 +225,48 @@ class ImageIO(ImageIOBase):
         converter: Converter = None,
         using_nvjpeg: bool = False,
     ) -> torch.Tensor:
-        path = Path(path) if not isinstance(path, Path) else path
+        type_of_file = None
+
+        is_bytes = isinstance(path, bytes)
+        printable = 'bytes' if is_bytes else path
+        if is_bytes:
+            type_of_file = imghdr.what(None, path) 
+            if type_of_file is None:
+                raise ValueError(f"Invalid image type for bytes!")
+            if type_of_file[0] != ".":
+                type_of_file = "." + type_of_file
+        
+        suffix = path.suffix.lower() if not is_bytes else type_of_file
+
+        path = Path(path) if not isinstance(path, Path) and not is_bytes else path
+
+        if using_nvjpeg and not self._nvjpeg_available:
+            warn_once(
+                f"nvjpeg not available, falling back to torchvision.io for image reading."
+            )
+            self.config.read_method = ReadMethod.torch
+            return self._read_torch(
+                path, specific_config, converter, using_nvjpeg=False
+            )
 
         if converter is None:
             converter = parse_colormode_torch(specific_config.color_mode)
 
-        if using_nvjpeg and path.suffix.lower() not in [".jpg", ".jpeg"]:
+        if using_nvjpeg and suffix not in [".jpg", ".jpeg"]:
             warn_once(
-                f"nvjpeg only supports jpeg images, falling back to torchvision for file: {path}"
+                f"nvjpeg only supports jpeg images, falling back to torchvision for file: {printable}"
             )
             return self._read_torch(
                 path, specific_config, converter, using_nvjpeg=False
             )
-        image_bytes_torch = tio.read_file(path.as_posix()) if not using_nvjpeg else None
+        if isinstance(path,bytes):
+            if suffix in [".jpg", ".jpeg"] and not using_nvjpeg and is_bytes:
+                image_bytes_torch = torch.from_numpy(np.frombuffer(path, dtype=np.uint8).copy())
+            elif not using_nvjpeg:
+                image_bytes_torch = torch.from_numpy(np.frombuffer(path,dtype=np.uint8).copy())
+        else:
+            image_bytes_torch = tio.read_file(path.as_posix()) if not using_nvjpeg else None
 
-        suffix = path.suffix.lower()
 
         if suffix in [".jpg", ".jpeg"] and not using_nvjpeg:
             try:
@@ -245,7 +278,7 @@ class ImageIO(ImageIOBase):
             except RuntimeError as e:
                 if "The provided mode is not supported" in str(e):
                     warn_once(
-                        f"Mode {converter.mode} not supported by torchvision.io.decode_jpeg, falling back to cv2.imread for file: {path}"
+                        f"Mode {converter.mode} not supported by torchvision.io.decode_jpeg, falling back to cv2.imread for file: {printable}"
                     )
                     image = self._read_fallback_torch(path, converter, specific_config)
                 else:
@@ -254,10 +287,10 @@ class ImageIO(ImageIOBase):
             try:
                 image = self._nvjpeg.read_image(
                     path.as_posix(), self._device_for_nvjpeg
-                )
+                ) if not is_bytes else self._nvjpeg.decode(path)
             except RuntimeError as e:
                 warn_once(
-                    f"Error reading image from nvjpeg torch: {e}, falling back to reading with torchvision for file: {path}"
+                    f"Error reading image from nvjpeg torch: {e}, falling back to reading with torchvision for file: {printable}"
                 )
                 # This is okay because if torchvision fails, it will fall back to cv2 to read the image.
                 return self._read_torch(
@@ -302,18 +335,21 @@ class ImageIO(ImageIOBase):
     def _read_np(
         self, path: Union[str, Path], specific_config: SpecificConfig
     ) -> np.ndarray:  # -> Any:
-        path = Path(path) if not isinstance(path, Path) else path
+        is_bytes = isinstance(path, bytes)
+        path = Path(path) if not isinstance(path, Path) and not is_bytes else path
         hint = "bgr" if self.config.color_mode.name.lower().startswith("bgr") else "rgb"
         readmode, channels, flip = specific_config.color_mode
-        image = cv2.imread(path.as_posix(), readmode)
+        image = cv2.imread(path.as_posix(), readmode) if not isinstance(path,bytes) else cv2.imdecode(np.frombuffer(path, dtype=np.uint8), readmode)
         image = specific_config.image_layout(image, channels, hint)
         return image.astype(specific_config.data_type)
 
     def _read_pil(
         self, path: Union[str, Path], specific_config: SpecificConfig
     ) -> Image.Image:
-        path = Path(path) if not isinstance(path, Path) else path
-        im = Image.open(path.as_posix())
+        is_bytes = isinstance(path, bytes)
+        path = Path(path) if not isinstance(path, Path) and not is_bytes else path
+
+        im = Image.open(path.as_posix()) if not is_bytes else Image.open(io.BytesIO(path))
         if specific_config.color_mode.upper() == "BGRA":
             if len(im.split()) == 1:
                 npim = np.array(im)

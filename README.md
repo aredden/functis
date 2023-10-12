@@ -58,6 +58,38 @@ for image in imreader.read_list(list_of_your_images):
     ...
 ```
 
+### Reading images as bytes
+
+> Relatively new feature (as of oct 11 2023)
+
+```python
+with open("./your_image.jpg", "rb") as f:
+    image = imreader.read(f.read())
+```
+
+Inspiration for this idea is that I wanted to have a way to efficienctly read images of all types from a web api, here is a simple fastapi example:
+
+```python
+from typing import Annotated
+from fastapi import FastAPI, Body
+
+app = FastAPI()
+inference_client = ...
+
+@app.post("/inference", tags=["inference"])
+async def inference(
+    image_bytes: Annotated[bytes, Body(media_type="application/octet-stream")]
+):
+    global inference_client
+    image = imreader.read(image_bytes)
+
+    with torch.no_grad():
+        results_json = inference_client.infer(image)
+    return results_json
+```
+
+
+
 ### Options
 
 - **Read Modes**: `torch`, `np`, `pil`, `nvjpeg` # torch nvjpeg reader is not public yet.
