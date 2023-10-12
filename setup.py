@@ -11,8 +11,7 @@ setup(
         "pillow",
         "torchvision",
         "pydantic",
-        "pyyaml",
-        "imghdr"
+        "pyyaml"
     ],
     author="Alex Redden",
     author_email="alex@aredden.net",
