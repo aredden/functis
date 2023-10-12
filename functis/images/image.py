@@ -236,9 +236,9 @@ class ImageIO(ImageIOBase):
             if type_of_file[0] != ".":
                 type_of_file = "." + type_of_file
         
-        suffix = path.suffix.lower() if not is_bytes else type_of_file
-
         path = Path(path) if not isinstance(path, Path) and not is_bytes else path
+
+        suffix = path.suffix.lower() if not is_bytes else type_of_file
 
         if using_nvjpeg and not self._nvjpeg_available:
             warn_once(
